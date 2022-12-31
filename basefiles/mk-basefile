@@ -192,10 +192,17 @@ debgetkeyring() {
     shift
     local keyring_url=$1
 
+    local deblist=""
     local keyrings_path='/usr/share/keyrings/'
-    if[ ! -f "${keyrings_path}/${keyring_name}" ];then
-        keyring_url="${keyring_url}/"$(wget -q -O - "${keyring_url}" | grep ".*-keyring_.*_all.deb" | sed 's#\(^.*href="\)\([^"]\+\)\(".*$\)#\2#g' | sort | tail -n1) &&
-        wget -q "${keyring_url}" && apt-get -qq install -y ./$(basename ${keyring_url}) && echo "./$(basename ${keyring_url})";fi
+    if [ ! -f "${keyrings_path}/${keyring_name}" ];then
+        local keyring_pkgs=$(wget -q -O - "${keyring_url}" | grep ".*-keyring_.*_all.deb" | sed 's#\(^.*href="\)\([^"]\+.deb\)\(".*$\)#\2#g' | sed 's#\(^.*-keyring_\).*$#\1#g' | sort -u)
+        for deb in ${keyring_pkgs[@]};do
+            deb_url="${keyring_url}/"$(wget -q -O - "${keyring_url}" | grep ".*${deb}.*_all.deb" | sed 's#\(^.*href="\)\([^"]\+.deb\)\(".*$\)#\2#g' | sort | tail -n1) &&
+            wget -q "${deb_url}" && apt-get -qq install -y "./$(basename ${deb_url})" && deblist="${deblist} ${deb%_}"
+            if [ -f "./$(basename ${deb_url})" ];then rm -f "./$(basename ${deb_url})";fi
+        done
+    fi
+    echo "${deblist}"
 }
 
 debgeneric() {
@@ -217,19 +224,19 @@ debgeneric() {
 
     check
     
-    debscript_d="/usr/share/debootstrap/scripts";dist_ref='gutsy'
+    local debscript_d="/usr/share/debootstrap/scripts";local dist_ref='gutsy'
     if [[ "${DIST}" =~ ^KALI ]];then
-    	dist="kali-rolling"
+    	local dist="kali-rolling"
     elif [[ "${DIST}" =~ ^DEEPIN ]];then
-	    dist="apricot";dist_ref='sid'
+	    local dist="apricot";local dist_ref='sid'
     fi
     if [ ! -f "${debscript_d}/${dist}" ];then ln -rs "${debscript_d}/${dist_ref}" "${debscript_d}/${dist}";fi
 
-    keyring_inst=""
+    local keyring_inst=""
     if [ -z "${keyring_name}" ] && [ -n "${keyring_url}" ];then
-        keyring_name="${dist}-archive-keyring.gpg"
+        local keyring_name="${dist}-archive-keyring.gpg";fi
     if [ -n "${keyring_name}" ] && [ -n "${keyring_url}" ];then
-        keyring_inst=$( debgetkeyring "${keyring_name}" "${keyring_url}");fi
+        local keyring_inst=$( debgetkeyring "${keyring_name}" "${keyring_url}");fi
 
     if [[ "${DIST}" =~ ^DEEPIN ]] && [ -n "${INCLUDE_DEEPIN}" ];then
     	local inc="--include=$INCLUDE_DEEPIN"
@@ -250,7 +257,7 @@ debgeneric() {
             arch=i386
 	fi
     echo "EXECUTE: debootstrap --arch $arch ${exc} $inc $dist $xtmp $mirror"
-	debootstrap --arch $arch {exc} $inc $dist $xtmp $mirror
+	debootstrap --arch $arch ${exc} $inc $dist $xtmp $mirror
     fi
 
     if [ -n "${keyring_inst}" ];then 
