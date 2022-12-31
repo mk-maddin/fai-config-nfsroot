@@ -192,7 +192,7 @@ debgeneric() {
     [ -n "${!exc}" ] && exc="--exclude=${!exc}" || unset exc
     dist=${dist,,}
 
-    key=""
+    key="";script_d="/usr/share/debootstrap/scripts";dist_ref='gutsy'
     if [[ "${DIST}" =~ ^PI_ ]];then
 	    key_f=$(mktemp -u --tmpdir --suffix=.gpg) &&
 	    wget -qO - "${KEYRING_RASPBIAN}" | gpg --import --no-default-keyring --keyring "${key_f}" - &&
@@ -208,9 +208,8 @@ debgeneric() {
     	key_d=$(mktemp -d --tmpdir ) && key_f="${key_d}/usr/share/keyrings/deepin-archive-uranus-keyring.gpg" &&
     	wget -q "${KEYRING_DEEPIN}" && dpkg -x "$(basename ${KEYRING_DEEPIN})" "${key_d}" &&
     	key="--keyring=${key_f} " && rm -f "$(basename ${KEYRING_DEEPIN})"
-	    dist="apricot";script_d="/usr/share/debootstrap/scripts"
-	    if [ ! -f "${script_d}/${dist}" ];then ln -rs "${script_d}/sid" "${script_d}/${dist}";fi
-    fi
+	    dist="apricot";dist_ref='sid';fi
+    if [ ! -f "${script_d}/${dist}" ];then ln -rs "${script_d}/${dist_ref}" "${script_d}/${dist}";fi
 
     check
     if [[ "${DIST}" =~ ^DEEPIN ]] && [ -n "${INCLUDE_DEEPIN}" ];then
