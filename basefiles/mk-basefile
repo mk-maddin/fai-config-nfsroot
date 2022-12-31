@@ -4,6 +4,7 @@
 #
 # Thomas Lange, Uni Koeln, 2011-2021
 # based on the Makefile implementation of Michael Goetze
+##--edited by mk.maddin: 2022-12-31
 #
 # Usage example: mk-basefile -J STRETCH64
 # This will create a STRETCH64.tar.xz basefile.
@@ -23,6 +24,14 @@
 MIRROR_DEBIAN=http://deb.debian.org/debian/
 MIRROR_UBUNTU=http://mirror.netcologne.de/ubuntu/
 MIRROR_CENTOS=http://mirror.netcologne.de/
+MIRROR_KALI="http://http.kali.org/kali/"
+KEYRING_KALI_URL="https://http.kali.org/kali/pool/main/k/kali-archive-keyring"
+KEYRING_KALI=''
+#KEYRING_KALI="https://http.kali.org/kali/pool/main/k/kali-archive-keyring/kali-archive-keyring_2020.2_all.deb"
+MIRROR_RASPBIAN="http://mirrordirector.raspbian.org/raspbian/"
+KEYRING_RASPBIAN="http://archive.raspbian.org/raspbian.public.key"
+MIRROR_DEEPIN="https://community-packages.deepin.com/deepin/"
+KEYRING_DEEPIN="https://community-packages.deepin.com/deepin/pool/main/d/deepin-keyring/deepin-keyring_2021.06.07-1_all.deb"
 
 EXCLUDE_SQUEEZE=isc-dhcp-client,isc-dhcp-common,info
 EXCLUDE_WHEEZY=info
@@ -40,8 +49,9 @@ EXCLUDE_BIONIC=udhcpc,dibbler-client,info
 EXCLUDE_FOCAL=udhcpc,dibbler-client,info
 
 # here you can add packages, that are needed very early
-INCLUDE_DEBIAN=
-
+INCLUDE_DEBIAN=netcat,usbutils,apt-transport-https
+INCLUDE_DEEPIN="${INCLUDE_DEBIAN},ca-certificates"
+INCLUDE_KALI=netcat-traditional,usbutils,apt-transport-https
 
 setarch() {
 
@@ -181,13 +191,38 @@ debgeneric() {
     [ -n "${!exc}" ] && exc="--exclude=${!exc}" || unset exc
     dist=${dist,,}
 
+    key=""
+    if [[ "${DIST}" =~ ^PI_ ]];then
+	    key_f=$(mktemp -u --tmpdir --suffix=.gpg) &&
+	    wget -qO - "${KEYRING_RASPBIAN}" | gpg --import --no-default-keyring --keyring "${key_f}" - &&
+	    key="--keyring=${key_f} "
+    elif [[ "${DIST}" =~ ^KALI ]];then
+	    if [ -z "${KEYRING_KALI}" ] && [ -n "${KEYRING_KALI_URL}" ];then
+    		KEYRING_KALI="${KEYRING_KALI_URL}/"$(wget -q -O - "${KEYRING_KALI_URL}" | grep "kali-archive-keyring_.*_all.deb" | sed 's#\(^.*href="\)\([^"]\+\)\(".*$\)#\2#g');fi
+    	key_d=$(mktemp -d --tmpdir ) && key_f="${key_d}/usr/share/keyrings/kali-archive-keyring.gpg" &&
+    	wget -q "${KEYRING_KALI}" && dpkg -x "$(basename ${KEYRING_KALI})" "${key_d}" &&
+    	key="--keyring=${key_f} " && rm -f "$(basename ${KEYRING_KALI})"
+    	dist="kali-rolling"
+    elif [[ "${DIST}" =~ ^DEEPIN ]];then
+    	key_d=$(mktemp -d --tmpdir ) && key_f="${key_d}/usr/share/keyrings/deepin-archive-uranus-keyring.gpg" &&
+    	wget -q "${KEYRING_DEEPIN}" && dpkg -x "$(basename ${KEYRING_DEEPIN})" "${key_d}" &&
+    	key="--keyring=${key_f} " && rm -f "$(basename ${KEYRING_DEEPIN})"
+	    dist="apricot";script_d="/usr/share/debootstrap/scripts"
+	    if [ ! -f "${script_d}/${dist}" ];then ln -rs "${script_d}/sid" "${script_d}/${dist}";fi
+    fi
+
     check
-    if [ -n "$INCLUDE_DEBIAN" ]; then
-	local inc="--include=$INCLUDE_DEBIAN"
+    if [[ "${DIST}" =~ ^DEEPIN ]] && [ -n "${INCLUDE_DEEPIN}" ];then
+    	local inc="--include=$INCLUDE_DEEPIN"
+    elif [[ "${DIST}" =~ ^KALI ]] && [ -n "${INCLUDE_KALI}" ];then
+	    local inc="--include=$INCLUDE_KALI"
+    elif [ -n "$INCLUDE_DEBIAN" ]; then
+    	local inc="--include=$INCLUDE_DEBIAN"
     fi
 
     if [ -n "$arch" ]; then
-	qemu-debootstrap --arch $arch ${exc} $inc $dist $xtmp $mirror
+    echo "EXECUTE: qemu-debootstrap --arch $arch ${key}${exc} $inc $dist $xtmp $mirror"
+	qemu-debootstrap --arch $arch ${key}${exc} $inc $dist $xtmp $mirror
 	target="${target}_${arch^^}"
     else
 	if [[ $DIST =~ 64 ]]; then
@@ -195,8 +230,12 @@ debgeneric() {
 	else
             arch=i386
 	fi
-	debootstrap --arch $arch ${exc} $inc $dist $xtmp $mirror
+    echo "EXECUTE: debootstrap --arch $arch ${key}${exc} $inc $dist $xtmp $mirror"
+	debootstrap --arch $arch ${key}{exc} $inc $dist $xtmp $mirror
     fi
+
+    [ -f "${key_f}" ] && rm -f "${key_f}"
+    [ -d "${key_d}" ] && rm -fr "${key_d}"
     cleanup-deb
     tarit
 }
@@ -225,6 +264,12 @@ prtdists() {
     BOOKWORM32   BOOKWORM64
     TRIXIE32     TRIXIE64
     SID32        SID64
+    KALI32       KALI64
+    DEEPIN32     DEEPIN64               
+                              PI_WHEEZY
+                              PI_JESSIE
+                              PI_STRETCH
+                              PI_BUSTER
 "
 }
 
@@ -302,6 +347,13 @@ case "$target" in
         debgeneric $target $MIRROR_UBUNTU ;;
     SQUEEZE*|WHEEZY*|JESSIE*|STRETCH*|BUSTER*|BULLSEYE*|BOOKWORM*|TRIXIE*|SID*)
         debgeneric $target $MIRROR_DEBIAN $ARCH;;
+    KALI*)
+        debgeneric $target $MIRROR_KALI $ARCH;;
+    DEEPIN*)
+	    debgeneric $target $MIRROR_DEEPIN $ARCH;;	
+    PI_WHEEZY|PI_JESSIE|PI_STRETCH|PI_BUSTER|PI_BULLSEYE)
+        export ARCH=armhf
+	    debgeneric $target $MIRROR_RASPBIAN $ARCH;;
     *) echo "Unknown distribution. Aborting."
        prtdists
        exit 99 ;;
