@@ -50,17 +50,23 @@ EXCLUDE_BULLSEYE=
 EXCLUDE_BOOKWORM=
 EXCLUDE_TRIXIE=
 EXCLUDE_SID=
+EXCLUDE_DEBIAN=
 
 EXCLUDE_TRUSTY=dhcp3-client,dhcp3-common,info
 EXCLUDE_XENIAL=udhcpc,dibbler-client,info
 EXCLUDE_BIONIC=udhcpc,dibbler-client,info
 EXCLUDE_FOCAL=udhcpc,dibbler-client,info
 EXCLUDE_JAMMY=udhcpc,dibbler-client,info
+EXCLUDE_UBUNTU=
 
 # here you can add packages, that are needed very early
 INCLUDE_DEBIAN=netcat,usbutils,apt-transport-https
-INCLUDE_DEEPIN="${INCLUDE_DEBIAN},ca-certificates"
+INCLUDE_JAMMY=
+INCLUDE_UBUNTU=
 INCLUDE_KALI=netcat-traditional,usbutils,apt-transport-https
+INCLUDE_RASPBIAN=
+INCLUDE_DEEPIN="${INCLUDE_DEBIAN},ca-certificates"
+
 
 setarch() {
 
@@ -224,6 +230,24 @@ debgeneric() {
     [ -n "${!inc}" ] && inc="--include=${!inc}" || unset inc
     dist=${dist,,}
 
+    if [ -z "${exc}" ];then
+        if [ "$mirror" == "${MIRROR_DEBIAN}"] && [ -n "$EXCLUDE_DEBIAN" ];then 
+            local exc="--exclude=$EXCLUDE_DEBIAN"
+        elif [ "$mirror" == "${MIRROR_UBUNTU}"] && [ -n "$EXCLUDE_UBUNTU" ];then 
+            local exc="--exclude=$EXCLUDE_UBUNTU"
+        elif [ "$mirror" == "${MIRROR_RASPBIAN}"] && [ -n "$EXCLUDE_RASPBIAN" ];then 
+            local exc="--exclude=$EXCLUDE_RASPBIAN";fi
+    fi
+
+    if [ -z "${inc}" ];then
+        if [ "$mirror" == "${MIRROR_DEBIAN}"] && [ -n "$INCLUDE_DEBIAN" ];then 
+            local inc="--include=$INCLUDE_DEBIAN"
+        elif [ "$mirror" == "${MIRROR_UBUNTU}"] && [ -n "$INCLUDE_UBUNTU" ];then 
+            local inc="--include=$INCLUDE_UBUNTU"
+        elif [ "$mirror" == "${MIRROR_RASPBIAN}"] && [ -n "$INCLUDE_RASPBIAN" ];then 
+            local inc="--include=$INCLUDE_RASPBIAN";fi
+    fi
+
     check
     
     local debscript_d="/usr/share/debootstrap/scripts";local dist_ref='gutsy'
@@ -239,9 +263,6 @@ debgeneric() {
         local keyring_name="${dist}-archive-keyring.gpg";fi
     if [ -n "${keyring_name}" ] && [ -n "${keyring_url}" ];then
         local keyring_inst=$( debgetkeyring "${keyring_name}" "${keyring_url}");fi
-
-    if [ -z "${inc}" ] && [ -n "$INCLUDE_DEBIAN" ]; then
-    	local inc="--include=$INCLUDE_DEBIAN";fi
 
     if [ -n "$arch" ]; then
     echo "EXECUTE: qemu-debootstrap --arch $arch ${exc} $inc $dist $xtmp $mirror"
