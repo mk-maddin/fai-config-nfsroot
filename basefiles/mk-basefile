@@ -231,20 +231,20 @@ debgeneric() {
     dist=${dist,,}
 
     if [ -z "${exc}" ];then
-        if [ "$mirror" == "${MIRROR_DEBIAN}"] && [ -n "$EXCLUDE_DEBIAN" ];then 
+        if [ "$mirror" == "${MIRROR_DEBIAN}" ] && [ -n "$EXCLUDE_DEBIAN" ];then 
             local exc="--exclude=$EXCLUDE_DEBIAN"
-        elif [ "$mirror" == "${MIRROR_UBUNTU}"] && [ -n "$EXCLUDE_UBUNTU" ];then 
+        elif [ "$mirror" == "${MIRROR_UBUNTU}" ] && [ -n "$EXCLUDE_UBUNTU" ];then 
             local exc="--exclude=$EXCLUDE_UBUNTU"
-        elif [ "$mirror" == "${MIRROR_RASPBIAN}"] && [ -n "$EXCLUDE_RASPBIAN" ];then 
+        elif [ "$mirror" == "${MIRROR_RASPBIAN}" ] && [ -n "$EXCLUDE_RASPBIAN" ];then 
             local exc="--exclude=$EXCLUDE_RASPBIAN";fi
     fi
 
     if [ -z "${inc}" ];then
-        if [ "$mirror" == "${MIRROR_DEBIAN}"] && [ -n "$INCLUDE_DEBIAN" ];then 
+        if [ "$mirror" == "${MIRROR_DEBIAN}" ] && [ -n "$INCLUDE_DEBIAN" ];then 
             local inc="--include=$INCLUDE_DEBIAN"
-        elif [ "$mirror" == "${MIRROR_UBUNTU}"] && [ -n "$INCLUDE_UBUNTU" ];then 
+        elif [ "$mirror" == "${MIRROR_UBUNTU}" ] && [ -n "$INCLUDE_UBUNTU" ];then 
             local inc="--include=$INCLUDE_UBUNTU"
-        elif [ "$mirror" == "${MIRROR_RASPBIAN}"] && [ -n "$INCLUDE_RASPBIAN" ];then 
+        elif [ "$mirror" == "${MIRROR_RASPBIAN}" ] && [ -n "$INCLUDE_RASPBIAN" ];then 
             local inc="--include=$INCLUDE_RASPBIAN";fi
     fi
 
