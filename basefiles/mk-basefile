@@ -220,6 +220,8 @@ debgeneric() {
     dist=${DIST%%[0-9][0-9]}
     local exc="EXCLUDE_$dist"
     [ -n "${!exc}" ] && exc="--exclude=${!exc}" || unset exc
+    local inc="INCLUDE_$dist"
+    [ -n "${!inc}" ] && inc="--include=${!inc}" || unset inc
     dist=${dist,,}
 
     check
@@ -238,13 +240,8 @@ debgeneric() {
     if [ -n "${keyring_name}" ] && [ -n "${keyring_url}" ];then
         local keyring_inst=$( debgetkeyring "${keyring_name}" "${keyring_url}");fi
 
-    if [[ "${DIST}" =~ ^DEEPIN ]] && [ -n "${INCLUDE_DEEPIN}" ];then
-    	local inc="--include=$INCLUDE_DEEPIN"
-    elif [[ "${DIST}" =~ ^KALI ]] && [ -n "${INCLUDE_KALI}" ];then
-	    local inc="--include=$INCLUDE_KALI"
-    elif [ -n "$INCLUDE_DEBIAN" ]; then
-    	local inc="--include=$INCLUDE_DEBIAN"
-    fi
+    if [ -z "${inc}" ] && [ -n "$INCLUDE_DEBIAN" ]; then
+    	local inc="--include=$INCLUDE_DEBIAN";fi
 
     if [ -n "$arch" ]; then
     echo "EXECUTE: qemu-debootstrap --arch $arch ${exc} $inc $dist $xtmp $mirror"
