@@ -25,13 +25,21 @@ MIRROR_DEBIAN=http://deb.debian.org/debian/
 MIRROR_UBUNTU=http://mirror.netcologne.de/ubuntu/
 MIRROR_CENTOS=http://mirror.netcologne.de/
 MIRROR_KALI="http://http.kali.org/kali/"
-KEYRING_KALI_URL="https://http.kali.org/kali/pool/main/k/kali-archive-keyring"
-KEYRING_KALI=''
-#KEYRING_KALI="https://http.kali.org/kali/pool/main/k/kali-archive-keyring/kali-archive-keyring_2020.2_all.deb"
 MIRROR_RASPBIAN="http://mirrordirector.raspbian.org/raspbian/"
-KEYRING_RASPBIAN="http://archive.raspbian.org/raspbian.public.key"
 MIRROR_DEEPIN="https://community-packages.deepin.com/deepin/"
-KEYRING_DEEPIN="https://community-packages.deepin.com/deepin/pool/main/d/deepin-keyring/deepin-keyring_2021.06.07-1_all.deb"
+
+# Keyrings are required for cross distribution building of basefiles
+KEYRING_DEBIAN="debian-archive-keyring.gpg"
+KEYRING_DEBIAN_URL="${MIRROR_DEBIAN}pool/main/d/debian-archive-keyring/"
+KEYRING_UBUNTU="ubuntu-archive-keyring.gpg"
+KEYRING_UBUNTU_URL="${MIRROR_UBUNTU}pool/main/u/ubuntu-keyring/"
+KEYRING_KALI="kali-archive-keyring.gpg"
+KEYRING_KALI_URL="${MIRROR_KALI}pool/main/k/kali-archive-keyring"
+KEYRING_RASPBIAN="raspbian-archive-keyring.gpg"
+KEYRING_RASPBIAN_URL="${MIRROR_RASPBIAN}pool/main/r/raspbian-archive-keyring/"
+#KEYRING_DEEPIN="deepin-archive-uranus-keyring.gpg"
+KEYRING_DEEPIN="uos-archive-keyring.gpg"
+KEYRING_DEEPIN_URL="${MIRROR_DEEPIN}pool/main/d/deepin-keyring"
 
 EXCLUDE_SQUEEZE=isc-dhcp-client,isc-dhcp-common,info
 EXCLUDE_WHEEZY=info
@@ -178,6 +186,17 @@ slc() {
     tarit
 }
 
+debgetkeyring() {
+
+    local keyring_name=$1
+    shift
+    local keyring_url=$1
+
+    local keyrings_path='/usr/share/keyrings/'
+    if[ ! -f "${keyrings_path}/${keyring_name}" ];then
+        keyring_url="${keyring_url}/"$(wget -q -O - "${keyring_url}" | grep ".*-keyring_.*_all.deb" | sed 's#\(^.*href="\)\([^"]\+\)\(".*$\)#\2#g' | sort | tail -n1) &&
+        wget -q "${keyring_url}" && apt-get -qq install -y ./$(basename ${keyring_url}) && echo "./$(basename ${keyring_url})";fi
+}
 
 debgeneric() {
 
@@ -186,32 +205,32 @@ debgeneric() {
     local mirror=$1
     shift
     local arch=$1
+    shift
+    local keyring_url=$1
+    shift
+    local keyring_name=$1
 
     dist=${DIST%%[0-9][0-9]}
     local exc="EXCLUDE_$dist"
     [ -n "${!exc}" ] && exc="--exclude=${!exc}" || unset exc
     dist=${dist,,}
 
-    key="";script_d="/usr/share/debootstrap/scripts";dist_ref='gutsy'
-    if [[ "${DIST}" =~ ^PI_ ]];then
-	    key_f=$(mktemp -u --tmpdir --suffix=.gpg) &&
-	    wget -qO - "${KEYRING_RASPBIAN}" | gpg --import --no-default-keyring --keyring "${key_f}" - &&
-	    key="--keyring=${key_f} "
-    elif [[ "${DIST}" =~ ^KALI ]];then
-	    if [ -z "${KEYRING_KALI}" ] && [ -n "${KEYRING_KALI_URL}" ];then
-    		KEYRING_KALI="${KEYRING_KALI_URL}/"$(wget -q -O - "${KEYRING_KALI_URL}" | grep "kali-archive-keyring_.*_all.deb" | sed 's#\(^.*href="\)\([^"]\+\)\(".*$\)#\2#g');fi
-    	key_d=$(mktemp -d --tmpdir ) && key_f="${key_d}/usr/share/keyrings/kali-archive-keyring.gpg" &&
-    	wget -q "${KEYRING_KALI}" && dpkg -x "$(basename ${KEYRING_KALI})" "${key_d}" &&
-    	key="--keyring=${key_f} " && rm -f "$(basename ${KEYRING_KALI})"
+    check
+    
+    debscript_d="/usr/share/debootstrap/scripts";dist_ref='gutsy'
+    if [[ "${DIST}" =~ ^KALI ]];then
     	dist="kali-rolling"
     elif [[ "${DIST}" =~ ^DEEPIN ]];then
-    	key_d=$(mktemp -d --tmpdir ) && key_f="${key_d}/usr/share/keyrings/deepin-archive-uranus-keyring.gpg" &&
-    	wget -q "${KEYRING_DEEPIN}" && dpkg -x "$(basename ${KEYRING_DEEPIN})" "${key_d}" &&
-    	key="--keyring=${key_f} " && rm -f "$(basename ${KEYRING_DEEPIN})"
-	    dist="apricot";dist_ref='sid';fi
-    if [ ! -f "${script_d}/${dist}" ];then ln -rs "${script_d}/${dist_ref}" "${script_d}/${dist}";fi
+	    dist="apricot";dist_ref='sid'
+    fi
+    if [ ! -f "${debscript_d}/${dist}" ];then ln -rs "${debscript_d}/${dist_ref}" "${debscript_d}/${dist}";fi
 
-    check
+    keyring_inst=""
+    if [ -z "${keyring_name}" ] && [ -n "${keyring_url}" ];then
+        keyring_name="${dist}-archive-keyring.gpg"
+    if [ -n "${keyring_name}" ] && [ -n "${keyring_url}" ];then
+        keyring_inst=$( debgetkeyring "${keyring_name}" "${keyring_url}");fi
+
     if [[ "${DIST}" =~ ^DEEPIN ]] && [ -n "${INCLUDE_DEEPIN}" ];then
     	local inc="--include=$INCLUDE_DEEPIN"
     elif [[ "${DIST}" =~ ^KALI ]] && [ -n "${INCLUDE_KALI}" ];then
@@ -221,8 +240,8 @@ debgeneric() {
     fi
 
     if [ -n "$arch" ]; then
-    echo "EXECUTE: qemu-debootstrap --arch $arch ${key}${exc} $inc $dist $xtmp $mirror"
-	qemu-debootstrap --arch $arch ${key}${exc} $inc $dist $xtmp $mirror
+    echo "EXECUTE: qemu-debootstrap --arch $arch ${exc} $inc $dist $xtmp $mirror"
+	qemu-debootstrap --arch $arch ${exc} $inc $dist $xtmp $mirror
 	target="${target}_${arch^^}"
     else
 	if [[ $DIST =~ 64 ]]; then
@@ -230,12 +249,14 @@ debgeneric() {
 	else
             arch=i386
 	fi
-    echo "EXECUTE: debootstrap --arch $arch ${key}${exc} $inc $dist $xtmp $mirror"
-	debootstrap --arch $arch ${key}{exc} $inc $dist $xtmp $mirror
+    echo "EXECUTE: debootstrap --arch $arch ${exc} $inc $dist $xtmp $mirror"
+	debootstrap --arch $arch {exc} $inc $dist $xtmp $mirror
     fi
 
-    [ -f "${key_f}" ] && rm -f "${key_f}"
-    [ -d "${key_d}" ] && rm -fr "${key_d}"
+    if [ -n "${keyring_inst}" ];then 
+        apt-get -qq purge "${keyring_inst}"
+        if [ -f "${keyring_inst}" ];then rm -f "${keyring_inst}";fi
+    fi
     cleanup-deb
     tarit
 }
@@ -345,16 +366,16 @@ case "$target" in
     SLC6_64) slc amd64 6 ;;
     SLC7_64) slc amd64 7 ;;
     TRUSTY*|XENIAL*|BIONIC*|FOCAL*|JAMMY*)
-        debgeneric $target $MIRROR_UBUNTU ;;
+        debgeneric $target $MIRROR_UBUNTU "$ARCH" "${KEYRING_UBUNTU_URL}" "${KEYRING_UBUNTU}";;
     SQUEEZE*|WHEEZY*|JESSIE*|STRETCH*|BUSTER*|BULLSEYE*|BOOKWORM*|TRIXIE*|SID*)
-        debgeneric $target $MIRROR_DEBIAN $ARCH;;
+        debgeneric $target $MIRROR_DEBIAN "$ARCH" "${KEYRING_DEBIAN_URL}" "${KEYRING_DEBIAN}";;
     KALI*)
-        debgeneric $target $MIRROR_KALI $ARCH;;
+        debgeneric $target $MIRROR_KALI "$ARCH" "${KEYRING_KALI_URL}" "${KEYRING_KALI}";;
     DEEPIN*)
-	    debgeneric $target $MIRROR_DEEPIN $ARCH;;	
+        debgeneric $target $MIRROR_DEEPIN "$ARCH" "${KEYRING_DEEPIN_URL}" "${KEYRING_DEEPIN}";;
     PI_WHEEZY|PI_JESSIE|PI_STRETCH|PI_BUSTER|PI_BULLSEYE)
         export ARCH=armhf
-	    debgeneric $target $MIRROR_RASPBIAN $ARCH;;
+	    debgeneric $target $MIRROR_RASPBIAN "$ARCH" "${KEYRING_RASPBIAN_URL}" "${KEYRING_RASPBIAN}";;
     *) echo "Unknown distribution. Aborting."
        prtdists
        exit 99 ;;
