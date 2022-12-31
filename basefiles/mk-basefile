@@ -279,7 +279,7 @@ debgeneric() {
     fi
 
     if [ -n "${keyring_inst}" ];then 
-        apt-get -qq purge "${keyring_inst}"
+        apt-get -qq purge -y "${keyring_inst}"
         if [ -f "${keyring_inst}" ];then rm -f "${keyring_inst}";fi
     fi
     cleanup-deb
