@@ -2,7 +2,7 @@
 
 # mk-basefile, create basefiles for some distributions
 #
-# Thomas Lange, Uni Koeln, 2011-2021
+# Thomas Lange, Uni Koeln, 2011-2022
 # based on the Makefile implementation of Michael Goetze
 ##--edited by mk.maddin: 2022-12-31
 #
@@ -11,7 +11,8 @@
 
 # Supported distributions (each i386/amd64):
 # Debian GNU/Linux
-# Ubuntu 14.04/16.04
+# Ubuntu 14.04/16.04/20.04/22.04
+# Rocky Linux 8/9
 # CentOS 5/6/7/8
 # Scientific Linux Cern 5/6
 #
@@ -49,6 +50,7 @@ EXCLUDE_BUSTER=
 EXCLUDE_BULLSEYE=
 EXCLUDE_BOOKWORM=
 EXCLUDE_TRIXIE=
+EXCLUDE_FORKY=
 EXCLUDE_SID=
 EXCLUDE_DEBIAN=
 
@@ -136,7 +138,8 @@ cleanup-deb() {
     chroot $xtmp apt-get clean
     rm -f $xtmp/etc/hostname $xtmp/etc/resolv.conf \
           $xtmp/var/lib/apt/lists/*_* $xtmp/usr/bin/qemu-*-static \
-          $xtmp/etc/udev/rules.d/70-persistent-net.rules
+          $xtmp/etc/udev/rules.d/70-persistent-net.rules \
+	  $xtmp/var/lib/dbus/machine-id
     > $xtmp/etc/machine-id
 }
 
@@ -160,6 +163,22 @@ cleanup-rinse() {
 tarit() {
 
     tar $attributes --numeric-owner --one-file-system -C $xtmp -cf - . | $zip > $target.$ext
+}
+
+
+rocky() {
+
+    local arch=$1
+    local vers=$2
+    local domain=$(domainname)
+
+    check
+    setarch $arch
+#    mkpost-centos
+    $l32 rinse --directory $xtmp --distribution rocky-$vers --arch $arch --before-post-install $xtmp/post
+    domainname $domain # workaround for #613377
+    cleanup-rinse
+    tarit
 }
 
 
@@ -290,6 +309,8 @@ prtdists() {
 
     echo "Available:
 
+    ROCKY8_64
+    ROCKY9_64
     CENTOS5_32   CENTOS5_64
     CENTOS6_32   CENTOS6_64
     CENTOS7_32   CENTOS7_64
@@ -310,6 +331,7 @@ prtdists() {
     BULLSEYE32   BULLSEYE64
     BOOKWORM32   BOOKWORM64
     TRIXIE32     TRIXIE64
+    FORKY32      FORKY64
     SID32        SID64
     KALI32       KALI64
     DEEPIN32     DEEPIN64               
@@ -325,14 +347,14 @@ usage() {
     cat <<EOF
 mk-basefile, create minimal base files for a Linux distritubtion
 
-   Copyright (C) 2011-2020 by Thomas Lange
+   Copyright (C) 2011-2022 by Thomas Lange
 
 Usage: mk-basefile [OPTION] ... DISTRIBUTION
 
    -s                   Show list of supported linux distributions
    -f ARCH              Build for foreign architecture ARCH.
    -d DIR               Use DIR for creating the temporary subtree structure.
-   -z                   Use gzip for compressing the tar file.
+   -z                   Use zstd for compressing the tar file.
    -J                   Use xz for compressing the tar file.
    -k                   Keep the temporary subtree structure, do not remove it.
    -h                   Print help.
@@ -357,7 +379,7 @@ while getopts ashzJd:kf: opt ; do
         a) echo "$0: Warning. -a is ignored, because xtattrs, acls and selinux are always added." ;;
         d) export TMPDIR=$OPTARG ;;
         f) export ARCH=$OPTARG ;;
-        z) zip="gzip -9"; ext=tar.gz ;;
+        z) zip="zstd -9"; ext=tar.zst ;;
         J) zip="xz -8" ext=tar.xz ;;
         k) cleanup=0 ;;
         h) usage ;;
@@ -385,6 +407,8 @@ case "$target" in
     CENTOS7_32) centos i386 7 ;;
     CENTOS7_64) centos amd64 7 ;;
     CENTOS8_64) centos amd64 8 ;;
+    ROCKY8_64) rocky amd64 8 ;;
+    ROCKY9_64) rocky amd64 9 ;;
     SLC5_32) slc i386 5 ;;
     SLC5_64) slc amd64 5 ;;
     SLC6_32) slc i386 6 ;;
@@ -392,7 +416,7 @@ case "$target" in
     SLC7_64) slc amd64 7 ;;
     TRUSTY*|XENIAL*|BIONIC*|FOCAL*|JAMMY*)
         debgeneric $target $MIRROR_UBUNTU "$ARCH" "${KEYRING_UBUNTU_URL}" "${KEYRING_UBUNTU}";;
-    SQUEEZE*|WHEEZY*|JESSIE*|STRETCH*|BUSTER*|BULLSEYE*|BOOKWORM*|TRIXIE*|SID*)
+    SQUEEZE*|WHEEZY*|JESSIE*|STRETCH*|BUSTER*|BULLSEYE*|BOOKWORM*|TRIXIE*|FORKY*|SID*)
         debgeneric $target $MIRROR_DEBIAN "$ARCH" "${KEYRING_DEBIAN_URL}" "${KEYRING_DEBIAN}";;
     KALI*)
         debgeneric $target $MIRROR_KALI "$ARCH" "${KEYRING_KALI_URL}" "${KEYRING_KALI}";;
