@@ -64,10 +64,10 @@ EXCLUDE_NOBLE=udhcpc,dibbler-client,inf
 EXCLUDE_UBUNTU=
 
 # here you can add packages, that are needed very early
-INCLUDE_DEBIAN=netcat,usbutils,apt-transport-https
+INCLUDE_DEBIAN=netcat-netcat-openbsd,usbutils,apt-transport-https
 INCLUDE_JAMMY=
 INCLUDE_UBUNTU=
-INCLUDE_KALI=netcat-traditional,usbutils,apt-transport-https
+INCLUDE_KALI=netcat-openbsd,usbutils,apt-transport-https
 INCLUDE_RASPBIAN=
 INCLUDE_DEEPIN="${INCLUDE_DEBIAN},ca-certificates"
 
