@@ -2,7 +2,7 @@
 
 # mk-basefile, create basefiles for some distributions
 #
-# Thomas Lange, Uni Koeln, 2011-2022
+# Thomas Lange, Uni Koeln, 2011-2024
 # based on the Makefile implementation of Michael Goetze
 ##--edited by mk.maddin: 2022-12-31
 #
@@ -12,6 +12,7 @@
 # Supported distributions (each i386/amd64):
 # Debian GNU/Linux
 # Ubuntu 14.04/16.04/20.04/22.04
+# AlmaLinux 9
 # Rocky Linux 8/9
 # CentOS 5/6/7/8
 # Scientific Linux Cern 5/6
@@ -59,6 +60,7 @@ EXCLUDE_XENIAL=udhcpc,dibbler-client,info
 EXCLUDE_BIONIC=udhcpc,dibbler-client,info
 EXCLUDE_FOCAL=udhcpc,dibbler-client,info
 EXCLUDE_JAMMY=udhcpc,dibbler-client,info
+EXCLUDE_NOBLE=udhcpc,dibbler-client,inf
 EXCLUDE_UBUNTU=
 
 # here you can add packages, that are needed very early
@@ -166,19 +168,28 @@ tarit() {
 }
 
 
-rocky() {
+rpmdist() {
 
     local arch=$1
     local vers=$2
+    local dist=$3
     local domain=$(domainname)
 
     check
     setarch $arch
-#    mkpost-centos
-    $l32 rinse --directory $xtmp --distribution rocky-$vers --arch $arch --before-post-install $xtmp/post
+    $l32 rinse --directory $xtmp --distribution $dist-$vers --arch $arch --before-post-install $xtmp/post
     domainname $domain # workaround for #613377
     cleanup-rinse
     tarit
+}
+
+
+alma() {
+    rpmdist $1 $2 alma
+}
+
+rocky() {
+    rpmdist $1 $2 rocky
 }
 
 
@@ -347,7 +358,8 @@ usage() {
     cat <<EOF
 mk-basefile, create minimal base files for a Linux distritubtion
 
-   Copyright (C) 2011-2022 by Thomas Lange
+   Copyright (C) 2011-2024 by Thomas Lange
+   forked by mk.maddin
 
 Usage: mk-basefile [OPTION] ... DISTRIBUTION
 
@@ -409,12 +421,13 @@ case "$target" in
     CENTOS8_64) centos amd64 8 ;;
     ROCKY8_64) rocky amd64 8 ;;
     ROCKY9_64) rocky amd64 9 ;;
+    ALMA9_64) alma amd64 9 ;;
     SLC5_32) slc i386 5 ;;
     SLC5_64) slc amd64 5 ;;
     SLC6_32) slc i386 6 ;;
     SLC6_64) slc amd64 6 ;;
     SLC7_64) slc amd64 7 ;;
-    TRUSTY*|XENIAL*|BIONIC*|FOCAL*|JAMMY*)
+    TRUSTY*|XENIAL*|BIONIC*|FOCAL*|JAMMY*|NOBLE)
         debgeneric $target $MIRROR_UBUNTU "$ARCH" "${KEYRING_UBUNTU_URL}" "${KEYRING_UBUNTU}";;
     SQUEEZE*|WHEEZY*|JESSIE*|STRETCH*|BUSTER*|BULLSEYE*|BOOKWORM*|TRIXIE*|FORKY*|SID*)
         debgeneric $target $MIRROR_DEBIAN "$ARCH" "${KEYRING_DEBIAN_URL}" "${KEYRING_DEBIAN}";;
