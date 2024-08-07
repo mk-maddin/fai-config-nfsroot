@@ -1,0 +1,4 @@
+#! /bin/bash
+if ifclass BACKPORTS; then
+	    ainsl -v /etc/apt/sources.list "^deb $apt_cdn/debian $release-backports main contrib non-free non-free-firmware"
+fi

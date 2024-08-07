@@ -1,6 +1,7 @@
 PACKAGES install-norec
 debootstrap
 git
+nwipe
 # package list for creating the NFSROOT
 
 PACKAGES install-norec FULL
@@ -62,7 +63,6 @@ grub-pc
 grub-efi-amd64-bin
 efibootmgr
 linux-image-amd64
-#linux-image-amd64/bullseye-backports # if you want to use a newer kernel
 
 PACKAGES install-norec ARM64
 grub-efi-arm64
@@ -82,3 +82,7 @@ fdisk gpg
 
 PACKAGES install-norec DEBIAN_11 DEBIAN_12
 fdisk gpg
+
+PACKAGES install-norec BACKPORTS
+linux-image-amd64/bookworm-backports
+debootstrap/bookworm-backports
